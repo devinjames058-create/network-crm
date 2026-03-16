@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devin's Network CRM</title>
+<script src="https://unpkg.com/@azure/msal-browser@3.11.1/lib/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --surface2: #1e1e21;
+    --surface3: #27272b;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --gold: #c9a84c;
+    --gold2: #e8c97a;
+    --text: #e8e6e0;
+    --muted: #7a7870;
+    --muted2: #a09e98;
+    --green: #4caf7d;
+    --red: #e05c5c;
+    --amber: #e09b3c;
+    --blue: #5b8fd4;
+    --tag-bg: rgba(201,168,76,0.1);
+  }
+
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; }
+
+  /* LOGIN SCREEN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; flex-direction: column; gap: 0;
+  }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 16px; padding: 48px 52px; text-align: center; max-width: 400px; width: 90%;
+  }
+  .login-logo { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--gold); margin-bottom: 4px; }
+  .login-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 32px; }
+  .login-desc { font-size: 13px; color: var(--muted2); line-height: 1.7; margin-bottom: 28px; }
+  .login-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--gold); color: #0e0e0f; border: none; border-radius: 9px;
+    padding: 13px 24px; font-size: 13px; font-weight: 500; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; width: 100%; transition: background .15s;
+  }
+  .login-btn:hover { background: var(--gold2); }
+  .login-btn svg { width: 18px; height: 18px; }
+  .login-note { font-size: 11px; color: var(--muted); margin-top: 16px; line-height: 1.6; }
+
+  /* APP */
+  #app { display: none; height: 100vh; overflow: hidden; }
+  .layout { display: grid; grid-template-columns: 264px 1fr; height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .logo-area { padding: 20px 18px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .logo { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--gold); }
+  .logo-sub { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-top: 2px; }
+
+  .user-pill { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .user-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--surface3); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: var(--gold); flex-shrink: 0; }
+  .user-name { font-size: 11px; color: var(--muted2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .logout-btn { background: none; border: none; color: var(--muted); font-size: 10px; cursor: pointer; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; flex-shrink: 0; }
+  .logout-btn:hover { color: var(--red); }
+
+  .sidebar-stats { padding: 14px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0; }
+  .stat-val { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--gold2); font-weight: 500; line-height: 1; }
+  .stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .sidebar-filters { padding: 12px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .filter-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .filter-btn { display: block; width: 100%; text-align: left; background: none; border: none; padding: 6px 8px; border-radius: 5px; color: var(--muted2); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .15s; margin-bottom: 2px; }
+  .filter-btn:hover, .filter-btn.active { background: var(--surface3); color: var(--text); }
+  .filter-btn .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; }
+  .filter-count { float: right; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
+
+  .sync-btn { margin: 12px 18px 0; background: var(--surface2); border: 1px solid var(--border2); border-radius: 7px; padding: 8px; font-size: 11px; color: var(--muted2); cursor: pointer; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; transition: all .15s; }
+  .sync-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .add-btn { margin: 10px 18px 14px; background: var(--gold); color: #0e0e0f; border: none; border-radius: 7px; padding: 10px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; letter-spacing: 0.03em; transition: background .15s; }
+  .add-btn:hover { background: var(--gold2); }
+
+  /* MAIN */
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .search { flex: 1; background: var(--surface2); border: 1px solid var(--border2); border-radius: 7px; padding: 8px 12px; color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; }
+  .search:focus { border-color: var(--gold); }
+  .search::placeholder { color: var(--muted); }
+  .sort-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--muted2); font-size: 11px; font-family: 'DM Mono', monospace; outline: none; cursor: pointer; }
+  .sort-select option { background: var(--surface2); }
+  .view-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  .content-area { flex: 1; overflow-y: auto; padding: 16px 24px; }
+  .contacts-grid { display: flex; flex-direction: column; gap: 7px; }
+
+  /* CONTACT CARDS */
+  .contact-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; cursor: pointer; transition: all .15s; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; }
+  .contact-card:hover { border-color: var(--border2); background: var(--surface2); }
+  .contact-card.selected { border-color: var(--gold); }
+
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .contact-info .cname { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .contact-info .crole { font-size: 11px; color: var(--muted2); margin-bottom: 5px; }
+  .contact-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--tag-bg); color: var(--gold); font-family: 'DM Mono', monospace; letter-spacing: 0.05em; text-transform: uppercase; }
+  .tag.green { background: rgba(76,175,125,0.1); color: var(--green); }
+  .tag.blue { background: rgba(91,143,212,0.1); color: var(--blue); }
+  .tag.amber { background: rgba(224,155,60,0.1); color: var(--amber); }
+  .tag.red { background: rgba(224,92,92,0.1); color: var(--red); }
+
+  .contact-meta { text-align: right; }
+  .days-ago { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .urgency-dot { width: 8px; height: 8px; border-radius: 50%; margin-left: auto; }
+
+  /* DETAIL PANEL */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 100; align-items: center; justify-content: center; }
+  .overlay.open { display: flex; }
+  .panel { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; width: 600px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+
+  .panel-header { padding: 20px 22px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 14px; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .panel-avatar { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+  .panel-name { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--text); font-weight: 500; }
+  .panel-role { font-size: 12px; color: var(--muted2); margin-top: 2px; }
+  .panel-firm { font-size: 11px; color: var(--gold); margin-top: 1px; font-family: 'DM Mono', monospace; }
+  .close-btn { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1; }
+  .close-btn:hover { color: var(--text); }
+
+  .panel-body { padding: 18px 22px; flex: 1; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 10px; font-family: 'DM Mono', monospace; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .meta-item label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .meta-item input, .meta-item select, .meta-item textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; resize: none; }
+  .meta-item input:focus, .meta-item select:focus, .meta-item textarea:focus { border-color: var(--gold); }
+  .meta-item.full { grid-column: 1 / -1; }
+  .meta-item textarea { min-height: 68px; }
+  .meta-item select option { background: var(--surface2); }
+
+  .ai-section { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .ai-spark { font-size: 14px; }
+  .ai-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold); font-family: 'DM Mono', monospace; }
+  .ai-output { font-size: 12px; color: var(--muted2); line-height: 1.75; min-height: 60px; white-space: pre-wrap; }
+  .ai-output.loading { color: var(--muted); font-style: italic; }
+  .ai-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .ai-btn { background: none; border: 1px solid var(--border2); border-radius: 6px; padding: 6px 12px; color: var(--muted2); font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .15s; }
+  .ai-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .ai-btn.primary { background: var(--gold); border-color: var(--gold); color: #0e0e0f; font-weight: 500; }
+  .ai-btn.primary:hover { background: var(--gold2); }
+  .copy-btn { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--muted); font-size: 10px; cursor: pointer; font-family: 'DM Mono', monospace; }
+  .copy-btn:hover { border-color: var(--green); color: var(--green); }
+
+  .outreach-log { margin-bottom: 16px; }
+  .log-entry { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .log-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); white-space: nowrap; min-width: 80px; padding-top: 2px; }
+  .log-note { font-size: 12px; color: var(--muted2); line-height: 1.5; }
+  .log-source { font-size: 9px; color: var(--blue); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .log-input-row { display: flex; gap: 8px; margin-top: 10px; }
+  .log-input { flex: 1; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; }
+  .log-input:focus { border-color: var(--gold); }
+  .log-add-btn { background: var(--surface3); border: 1px solid var(--border2); border-radius: 6px; padding: 7px 14px; color: var(--muted2); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .log-add-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  .panel-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 8px; position: sticky; bottom: 0; background: var(--surface); }
+  .save-btn { flex: 1; background: var(--gold); border: none; border-radius: 7px; padding: 10px; color: #0e0e0f; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background .15s; }
+  .save-btn:hover { background: var(--gold2); }
+  .delete-btn { background: none; border: 1px solid var(--border2); border-radius: 7px; padding: 10px 14px; color: var(--muted); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .15s; }
+  .delete-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* ADD PANEL */
+  .add-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; align-items: center; justify-content: center; }
+  .add-overlay.open { display: flex; }
+  .add-panel { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; width: 480px; padding: 24px; }
+  .add-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--text); margin-bottom: 16px; }
+  .add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .add-field label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .add-field input, .add-field select { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 10px; color: var(--text); font-size: 12px; font-family: 'DM Sans', sans-serif; outline: none; }
+  .add-field input:focus, .add-field select:focus { border-color: var(--gold); }
+  .add-field.full { grid-column: 1 / -1; }
+  .add-field select option { background: var(--surface2); }
+  .add-footer { display: flex; gap: 8px; }
+  .cancel-btn { flex: 1; background: none; border: 1px solid var(--border2); border-radius: 7px; padding: 10px; color: var(--muted); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .confirm-btn { flex: 2; background: var(--gold); border: none; border-radius: 7px; padding: 10px; color: #0e0e0f; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .confirm-btn:hover { background: var(--gold2); }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface3); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 16px; font-size: 12px; color: var(--text); z-index: 999; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* LOADING */
+  .sync-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); margin-right: 6px; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Devin's Network</div>
+    <div class="login-sub">Contact Intelligence CRM</div>
+    <p class="login-desc">Sign in with Microsoft to sync your Outlook contacts and detect last outreach dates from your sent mail automatically.</p>
+    <button class="login-btn" onclick="signIn()">
+      <svg viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <p class="login-note">Requires Contacts.Read and Mail.ReadBasic permissions.<br>Your data stays in your browser — nothing is stored externally.</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <div class="sidebar">
+      <div class="logo-area">
+        <div class="logo">Devin's Network</div>
+        <div class="logo-sub">Contact Intelligence</div>
+      </div>
+      <div class="user-pill">
+        <div class="user-avatar" id="user-initials">DJ</div>
+        <span class="user-name" id="user-display-name">Loading...</span>
+        <button class="logout-btn" onclick="signOut()">sign out</button>
+      </div>
+      <div class="sidebar-stats">
+        <div class="stat">
+          <div class="stat-val" id="stat-total">0</div>
+          <div class="stat-label">Contacts</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-overdue">0</div>
+          <div class="stat-label">Follow Up</div>
+        </div>
+      </div>
+      <div class="sidebar-filters">
+        <div class="filter-label">Filter</div>
+        <button class="filter-btn active" onclick="setFilter('all',this)">
+          <span class="dot" style="background:var(--muted)"></span>All contacts
+          <span class="filter-count" id="fc-all">0</span>
+        </button>
+        <button class="filter-btn" onclick="setFilter('overdue',this)">
+          <span class="dot" style="background:var(--red)"></span>Overdue
+          <span class="filter-count" id="fc-overdue">0</span>
+        </button>
+        <button class="filter-btn" onclick="setFilter('soon',this)">
+          <span class="dot" style="background:var(--amber)"></span>Due soon
+          <span class="filter-count" id="fc-soon">0</span>
+        </button>
+        <button class="filter-btn" onclick="setFilter('active',this)">
+          <span class="dot" style="background:var(--green)"></span>Active
+          <span class="filter-count" id="fc-active">0</span>
+        </button>
+      </div>
+      <button class="sync-btn" id="sync-btn" onclick="syncOutlook()">↻ Sync Outlook Contacts</button>
+      <button class="add-btn" onclick="openAddPanel()">+ Add Contact</button>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <input class="search" id="search-input" placeholder="Search contacts, firms, notes..." oninput="renderContacts()">
+        <select class="sort-select" id="sort-select" onchange="renderContacts()">
+          <option value="urgency">Sort: Urgency</option>
+          <option value="name">Sort: Name</option>
+          <option value="firm">Sort: Firm</option>
+          <option value="recent">Sort: Recent</option>
+        </select>
+        <span class="view-count" id="view-count">0 contacts</span>
+      </div>
+      <div class="content-area">
+        <div class="contacts-grid" id="contacts-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="overlay" id="detail-overlay">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-avatar" id="panel-avatar"></div>
+      <div>
+        <div class="panel-name" id="panel-name"></div>
+        <div class="panel-role" id="panel-role"></div>
+        <div class="panel-firm" id="panel-firm"></div>
+      </div>
+      <button class="close-btn" onclick="closePanel()">×</button>
+    </div>
+    <div class="panel-body">
+      <div class="section-title">Contact Info</div>
+      <div class="meta-grid">
+        <div class="meta-item"><label>Name</label><input id="edit-name" type="text"></div>
+        <div class="meta-item"><label>Firm / Company</label><input id="edit-firm" type="text"></div>
+        <div class="meta-item full"><label>Role / Title</label><input id="edit-role" type="text"></div>
+        <div class="meta-item"><label>Category</label>
+          <select id="edit-category">
+            <option>Goldman Sachs</option><option>SEO / Program</option><option>AltFinance</option>
+            <option>MLT</option><option>Morehouse</option><option>Real Estate</option>
+            <option>Target Firm</option><option>Mentor</option><option>Peer</option><option>Other</option>
+          </select>
+        </div>
+        <div class="meta-item"><label>Follow-up interval (days)</label><input id="edit-interval" type="number" min="7" max="90" value="30"></div>
+        <div class="meta-item"><label>Last outreach</label><input id="edit-last-outreach" type="date"></div>
+        <div class="meta-item"><label>Email</label><input id="edit-email" type="email"></div>
+        <div class="meta-item full"><label>Context / Notes</label><textarea id="edit-context"></textarea></div>
+      </div>
+
+      <div class="section-title">Outreach Log</div>
+      <div class="outreach-log" id="outreach-log"></div>
+      <div class="log-input-row">
+        <input class="log-input" id="log-input" placeholder="Log a call, email, coffee chat...">
+        <button class="log-add-btn" onclick="addLogEntry()">+ Log</button>
+      </div>
+
+      <div style="height:16px"></div>
+      <div class="section-title">AI Follow-up Draft</div>
+      <div class="ai-section">
+        <div class="ai-header">
+          <span class="ai-spark">✦</span>
+          <span class="ai-label">Claude Draft</span>
+          <button class="copy-btn" onclick="copyDraft()" id="copy-btn">copy</button>
+        </div>
+        <div class="ai-output" id="ai-output">Click "Generate" to get a personalized follow-up message drafted in your voice.</div>
+        <div class="ai-actions">
+          <button class="ai-btn primary" onclick="generateFollowUp('auto')">Generate follow-up</button>
+          <button class="ai-btn" onclick="generateFollowUp('linkedin')">LinkedIn DM</button>
+          <button class="ai-btn" onclick="generateFollowUp('email')">Email</button>
+          <button class="ai-btn" onclick="generateFollowUp('checkin')">Quick check-in</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="save-btn" onclick="saveContact()">Save changes</button>
+      <button class="delete-btn" onclick="deleteContact()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD OVERLAY -->
+<div class="add-overlay" id="add-overlay">
+  <div class="add-panel">
+    <div class="add-title">Add Contact</div>
+    <div class="add-grid">
+      <div class="add-field"><label>Name *</label><input id="add-name" placeholder="Jane Smith"></div>
+      <div class="add-field"><label>Firm *</label><input id="add-firm" placeholder="Goldman Sachs"></div>
+      <div class="add-field full"><label>Role / Title</label><input id="add-role" placeholder="VP, Asset Management"></div>
+      <div class="add-field"><label>Category</label>
+        <select id="add-category">
+          <option>Goldman Sachs</option><option>SEO / Program</option><option>AltFinance</option>
+          <option>MLT</option><option>Morehouse</option><option>Real Estate</option>
+          <option>Target Firm</option><option>Mentor</option><option>Peer</option><option>Other</option>
+        </select>
+      </div>
+      <div class="add-field"><label>Last outreach</label><input id="add-last-outreach" type="date"></div>
+      <div class="add-field full"><label>Context</label><input id="add-context" placeholder="Met at AltFinance summit..."></div>
+    </div>
+    <div class="add-footer">
+      <button class="cancel-btn" onclick="closeAddPanel()">Cancel</button>
+      <button class="confirm-btn" onclick="confirmAddContact()">Add Contact</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── MSAL CONFIG ───────────────────────────────────────────────
+const CLIENT_ID = '0a5b56b3-bb73-49c2-8fa9-f6535fcdfa13';
+const msalConfig = {
+  auth: {
+    clientId: CLIENT_ID,
+    authority: 'https://login.microsoftonline.com/common',
+    redirectUri: window.location.origin + window.location.pathname
+  },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
+};
+const SCOPES = ['User.Read', 'Contacts.Read', 'Mail.ReadBasic'];
+let msalInstance;
+
+let contacts = [];
+let nextId = 1;
+let currentId = null;
+let activeFilter = 'all';
+let graphToken = null;
+
+const COLORS = [
+  {bg:'#2a1f0e',color:'#c9a84c'},{bg:'#0e1f2a',color:'#5b8fd4'},
+  {bg:'#0e2a1a',color:'#4caf7d'},{bg:'#2a1a0e',color:'#e09b3c'},
+  {bg:'#1e0e2a',color:'#9b7bd4'},{bg:'#2a0e1a',color:'#d45b8f'}
+];
+
+// ─── AUTH ───────────────────────────────────────────────────────
+async function signIn() {
+  try {
+    await msalInstance.handleRedirectPromise();
+    const result = await msalInstance.loginPopup({ scopes: SCOPES });
+    msalInstance.setActiveAccount(result.account);
+    await onSignedIn(result.account);
+  } catch(e) {
+    showToast('Sign-in failed: ' + (e.message || e));
+  }
+}
+
+async function onSignedIn(account) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const name = account.name || account.username;
+  document.getElementById('user-display-name').textContent = name;
+  document.getElementById('user-initials').textContent = name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  loadLocal();
+  await syncOutlook();
+}
+
+function signOut() {
+  msalInstance.logoutPopup();
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+async function getToken() {
+  const account = msalInstance.getActiveAccount();
+  if (!account) return null;
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account });
+    return result.accessToken;
+  } catch {
+    const result = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+    return result.accessToken;
+  }
+}
+
+// ─── GRAPH SYNC ─────────────────────────────────────────────────
+async function syncOutlook() {
+  const btn = document.getElementById('sync-btn');
+  btn.innerHTML = '<span class="sync-indicator"></span>Syncing...';
+  btn.disabled = true;
+  try {
+    const token = await getToken();
+    if (!token) return;
+    graphToken = token;
+    await fetchOutlookContacts(token);
+    await fetchSentMailDates(token);
+    saveLocal();
+    renderContacts();
+    showToast('Outlook sync complete');
+  } catch(e) {
+    showToast('Sync error: ' + (e.message || 'Unknown error'));
+  }
+  btn.innerHTML = '↻ Sync Outlook Contacts';
+  btn.disabled = false;
+}
+
+async function fetchOutlookContacts(token) {
+  let url = 'https://graph.microsoft.com/v1.0/me/contacts?$top=100&$select=displayName,emailAddresses,companyName,jobTitle,mobilePhone,businessPhones';
+  let fetched = 0;
+  while (url) {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) break;
+    const data = await res.json();
+    const items = data.value || [];
+    for (const c of items) {
+      if (!c.displayName) continue;
+      const email = c.emailAddresses?.[0]?.address || '';
+      const existing = contacts.find(x => x.email && x.email.toLowerCase() === email.toLowerCase())
+        || contacts.find(x => x.name.toLowerCase() === c.displayName.toLowerCase());
+      if (existing) {
+        if (!existing.firm && c.companyName) existing.firm = c.companyName;
+        if (!existing.role && c.jobTitle) existing.role = c.jobTitle;
+        if (!existing.email && email) existing.email = email;
+      } else {
+        contacts.push({
+          id: nextId++,
+          name: c.displayName,
+          firm: c.companyName || '',
+          role: c.jobTitle || '',
+          category: inferCategory(c),
+          lastOutreach: null,
+          interval: 30,
+          email,
+          context: '',
+          log: [],
+          source: 'outlook'
+        });
+        fetched++;
+      }
+    }
+    url = data['@odata.nextLink'] || null;
+  }
+  if (fetched > 0) showToast(`Imported ${fetched} new contacts from Outlook`);
+}
+
+async function fetchSentMailDates(token) {
+  // Scan sent mail to detect last outreach per contact email
+  const url = 'https://graph.microsoft.com/v1.0/me/mailFolders/SentItems/messages?$top=100&$select=toRecipients,sentDateTime&$orderby=sentDateTime desc';
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const messages = data.value || [];
+    const emailDateMap = {};
+    for (const msg of messages) {
+      const sent = msg.sentDateTime?.split('T')[0];
+      for (const rec of (msg.toRecipients || [])) {
+        const addr = rec.emailAddress?.address?.toLowerCase();
+        if (addr && !emailDateMap[addr]) emailDateMap[addr] = sent;
+      }
+    }
+    let updated = 0;
+    for (const c of contacts) {
+      if (!c.email) continue;
+      const addr = c.email.toLowerCase();
+      if (emailDateMap[addr]) {
+        const existing = c.lastOutreach;
+        if (!existing || emailDateMap[addr] > existing) {
+          c.lastOutreach = emailDateMap[addr];
+          if (!c.log.find(l => l.source === 'outlook-mail' && l.date === emailDateMap[addr])) {
+            c.log.push({ date: emailDateMap[addr], note: 'Email sent (detected from Outlook sent mail)', source: 'outlook-mail' });
+          }
+          updated++;
+        }
+      }
+    }
+    if (updated > 0) showToast(`Updated outreach dates for ${updated} contacts from sent mail`);
+  } catch(e) { /* mail permission may not be granted */ }
+}
+
+function inferCategory(c) {
+  const text = ((c.companyName || '') + ' ' + (c.jobTitle || '')).toLowerCase();
+  if (text.includes('goldman')) return 'Goldman Sachs';
+  if (text.includes('blackstone') || text.includes('apollo') || text.includes('kkr') || text.includes('ares')) return 'Target Firm';
+  if (text.includes('morehouse')) return 'Morehouse';
+  if (text.includes('seo')) return 'SEO / Program';
+  if (text.includes('altfinance')) return 'AltFinance';
+  if (text.includes('mlt')) return 'MLT';
+  if (text.includes('real estate') || text.includes('rmr') || text.includes('cbre') || text.includes('jll')) return 'Real Estate';
+  return 'Other';
+}
+
+// ─── LOCAL STORAGE ───────────────────────────────────────────────
+function saveLocal() {
+  localStorage.setItem('crm_contacts', JSON.stringify(contacts));
+  localStorage.setItem('crm_nextid', nextId);
+}
+
+function loadLocal() {
+  try {
+    const saved = localStorage.getItem('crm_contacts');
+    if (saved) { contacts = JSON.parse(saved); nextId = parseInt(localStorage.getItem('crm_nextid') || '1'); }
+  } catch(e) {}
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────
+function daysAgo(dateStr) {
+  if (!dateStr) return 9999;
+  return Math.floor((new Date() - new Date(dateStr)) / 86400000);
+}
+
+function urgencyStatus(c) {
+  const d = daysAgo(c.lastOutreach);
+  if (d > c.interval) return 'overdue';
+  if (d > c.interval * 0.7) return 'soon';
+  return 'active';
+}
+
+function urgencyColor(s) {
+  return {overdue:'var(--red)',soon:'var(--amber)',active:'var(--green)'}[s];
+}
+
+function getAvatar(name, idx) {
+  const c = COLORS[idx % COLORS.length];
+  const initials = name.split(' ').map(w=>w[0]).filter(Boolean).slice(0,2).join('');
+  return {...c, initials};
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────
+function renderContacts() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const sort = document.getElementById('sort-select').value;
+  let list = contacts.filter(c => {
+    const match = !q || [c.name,c.firm,c.role,c.context,c.category,c.email].join(' ').toLowerCase().includes(q);
+    if (!match) return false;
+    if (activeFilter === 'overdue') return urgencyStatus(c) === 'overdue';
+    if (activeFilter === 'soon') return urgencyStatus(c) === 'soon';
+    if (activeFilter === 'active') return urgencyStatus(c) === 'active';
+    return true;
+  });
+
+  list.sort((a,b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name);
+    if (sort === 'firm') return (a.firm||'').localeCompare(b.firm||'');
+    if (sort === 'recent') return daysAgo(a.lastOutreach) - daysAgo(b.lastOutreach);
+    const order = {overdue:0,soon:1,active:2};
+    return order[urgencyStatus(a)] - order[urgencyStatus(b)];
+  });
+
+  const grid = document.getElementById('contacts-grid');
+  if (list.length === 0) {
+    grid.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);font-size:13px">${contacts.length === 0 ? 'Sync your Outlook contacts to get started.' : 'No contacts match this filter.'}</div>`;
+  } else {
+    grid.innerHTML = list.map((c) => {
+      const idx = contacts.indexOf(c);
+      const av = getAvatar(c.name, idx);
+      const status = urgencyStatus(c);
+      const d = daysAgo(c.lastOutreach);
+      const dLabel = d === 9999 ? 'Never' : d === 0 ? 'Today' : d === 1 ? '1d ago' : `${d}d ago`;
+      const catColor = {'Goldman Sachs':'green','SEO / Program':'blue','AltFinance':'amber','MLT':'blue','Target Firm':'red'}[c.category] || '';
+      const roleStr = [c.role, c.firm].filter(Boolean).join(' · ');
+      return `<div class="contact-card" onclick="openContact(${c.id})">
+        <div class="avatar" style="background:${av.bg};color:${av.color}">${av.initials}</div>
+        <div class="contact-info">
+          <div class="cname">${c.name}</div>
+          <div class="crole">${roleStr || '—'}</div>
+          <div class="contact-tags">
+            <span class="tag ${catColor}">${c.category}</span>
+            ${status==='overdue'?'<span class="tag red">Follow up</span>':''}
+            ${c.source==='outlook'?'<span class="tag blue">Outlook</span>':''}
+          </div>
+        </div>
+        <div class="contact-meta">
+          <div class="days-ago">${dLabel}</div>
+          <div class="urgency-dot" style="background:${urgencyColor(status)};margin-left:auto"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('view-count').textContent = `${list.length} contact${list.length!==1?'s':''}`;
+  updateStats();
+}
+
+function updateStats() {
+  const overdue = contacts.filter(c=>urgencyStatus(c)==='overdue').length;
+  const soon = contacts.filter(c=>urgencyStatus(c)==='soon').length;
+  document.getElementById('stat-total').textContent = contacts.length;
+  document.getElementById('stat-overdue').textContent = overdue + soon;
+  document.getElementById('fc-all').textContent = contacts.length;
+  document.getElementById('fc-overdue').textContent = overdue;
+  document.getElementById('fc-soon').textContent = soon;
+  document.getElementById('fc-active').textContent = contacts.filter(c=>urgencyStatus(c)==='active').length;
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderContacts();
+}
+
+// ─── CONTACT DETAIL ──────────────────────────────────────────────
+function openContact(id) {
+  const c = contacts.find(x=>x.id===id);
+  if (!c) return;
+  currentId = id;
+  const idx = contacts.indexOf(c);
+  const av = getAvatar(c.name, idx);
+  const pa = document.getElementById('panel-avatar');
+  pa.textContent = av.initials; pa.style.background = av.bg; pa.style.color = av.color;
+  document.getElementById('panel-name').textContent = c.name;
+  document.getElementById('panel-role').textContent = c.role || '';
+  document.getElementById('panel-firm').textContent = c.firm || '';
+  document.getElementById('edit-name').value = c.name;
+  document.getElementById('edit-firm').value = c.firm || '';
+  document.getElementById('edit-role').value = c.role || '';
+  document.getElementById('edit-category').value = c.category;
+  document.getElementById('edit-interval').value = c.interval;
+  document.getElementById('edit-last-outreach').value = c.lastOutreach || '';
+  document.getElementById('edit-email').value = c.email || '';
+  document.getElementById('edit-context').value = c.context || '';
+  document.getElementById('ai-output').textContent = 'Click "Generate" to get a personalized follow-up message drafted in your voice.';
+  document.getElementById('ai-output').className = 'ai-output';
+  renderLog(c);
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function renderLog(c) {
+  const el = document.getElementById('outreach-log');
+  if (!c.log || c.log.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0">No outreach logged yet.</div>';
+    return;
+  }
+  el.innerHTML = c.log.slice().reverse().map(e => `
+    <div class="log-entry">
+      <div class="log-date">${e.date}</div>
+      <div>
+        <div class="log-note">${e.note}</div>
+        ${e.source ? `<div class="log-source">↑ ${e.source}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function addLogEntry() {
+  const c = contacts.find(x=>x.id===currentId);
+  if (!c) return;
+  const input = document.getElementById('log-input');
+  const note = input.value.trim();
+  if (!note) return;
+  const today = new Date().toISOString().split('T')[0];
+  if (!c.log) c.log = [];
+  c.log.push({date:today, note});
+  c.lastOutreach = today;
+  input.value = '';
+  renderLog(c);
+  renderContacts();
+  saveLocal();
+}
+
+function closePanel() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  currentId = null;
+}
+
+function saveContact() {
+  const c = contacts.find(x=>x.id===currentId);
+  if (!c) return;
+  c.name = document.getElementById('edit-name').value;
+  c.firm = document.getElementById('edit-firm').value;
+  c.role = document.getElementById('edit-role').value;
+  c.category = document.getElementById('edit-category').value;
+  c.interval = parseInt(document.getElementById('edit-interval').value) || 30;
+  c.lastOutreach = document.getElementById('edit-last-outreach').value || null;
+  c.email = document.getElementById('edit-email').value;
+  c.context = document.getElementById('edit-context').value;
+  document.getElementById('panel-name').textContent = c.name;
+  document.getElementById('panel-role').textContent = c.role;
+  document.getElementById('panel-firm').textContent = c.firm;
+  saveLocal();
+  renderContacts();
+  showToast('Contact saved');
+}
+
+function deleteContact() {
+  if (!confirm('Delete this contact?')) return;
+  contacts = contacts.filter(x=>x.id!==currentId);
+  saveLocal();
+  closePanel();
+  renderContacts();
+}
+
+// ─── ADD CONTACT ─────────────────────────────────────────────────
+function openAddPanel() { document.getElementById('add-overlay').classList.add('open'); }
+function closeAddPanel() { document.getElementById('add-overlay').classList.remove('open'); }
+
+function confirmAddContact() {
+  const name = document.getElementById('add-name').value.trim();
+  const firm = document.getElementById('add-firm').value.trim();
+  if (!name || !firm) { showToast('Name and firm are required'); return; }
+  contacts.push({
+    id: nextId++,
+    name, firm,
+    role: document.getElementById('add-role').value.trim(),
+    category: document.getElementById('add-category').value,
+    lastOutreach: document.getElementById('add-last-outreach').value || null,
+    interval: 30,
+    email: '',
+    context: document.getElementById('add-context').value.trim(),
+    log: []
+  });
+  saveLocal();
+  closeAddPanel();
+  ['add-name','add-firm','add-role','add-context'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('add-last-outreach').value = '';
+  renderContacts();
+  showToast('Contact added');
+}
+
+// ─── AI FOLLOW-UP ────────────────────────────────────────────────
+async function generateFollowUp(mode) {
+  const c = contacts.find(x=>x.id===currentId);
+  if (!c) return;
+  const output = document.getElementById('ai-output');
+  output.className = 'ai-output loading';
+  output.textContent = 'Drafting your message...';
+
+  const d = daysAgo(c.lastOutreach);
+  const dLabel = d === 9999 ? 'never reached out before' : d === 0 ? 'reached out today' : `last reached out ${d} days ago`;
+  const logSummary = c.log?.length ? 'Recent log: ' + c.log.slice(-3).map(e=>`"${e.note}"`).join('; ') : 'No prior outreach logged.';
+  const modeInstr = {
+    auto: 'Choose the best format (email or LinkedIn DM) and draft a natural follow-up message',
+    linkedin: 'Draft a LinkedIn DM — concise, under 80 words, warm but professional, no fluff',
+    email: 'Draft a professional email with a subject line — 150-200 words, substantive and specific',
+    checkin: 'Draft a very brief check-in message — 2-3 sentences max, casual but sharp'
+  }[mode] || 'Draft a follow-up message';
+
+  const prompt = `You are drafting a professional networking message for Devin-James Skerritt. Here is his profile:
+- Junior Finance major at Morehouse College, strong GPA
+- Secured a 2026 Goldman Sachs Asset & Wealth Management summer analyst role in Atlanta
+- Completed 2025 summer internship at The RMR Group (multifamily asset management)
+- Active in AltFinance Fellowship (Cohort 5), SEO Career AWM track, MLT, Project Destined, Scholars of Finance, Morehouse Student Investment Fund
+- Working on CFA Level 1 and SIE exam
+- Currently finalizing an investment memo for Republic House, a multifamily property in Frisco, TX
+- Community-driven, philosophically inclined, building his network from scratch with no inherited industry connections
+
+Write in Devin's voice: confident, warm, substantive, intellectually sharp. Never sycophantic or filler-heavy. Never start with "I hope this message finds you well."
+
+Contact: ${c.name}
+Title/Firm: ${c.role || 'Unknown role'} at ${c.firm || 'Unknown firm'}
+Category: ${c.category}
+Context (how Devin knows them): ${c.context || 'No additional context provided.'}
+${logSummary}
+Devin ${dLabel}.
+Urgency: ${urgencyStatus(c) === 'overdue' ? 'Overdue — needs to re-engage this relationship' : 'Maintaining an active relationship'}
+
+Task: ${modeInstr}. Be specific and personal — reference real details from the context. Make it sound genuinely written by Devin, not AI-generated.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.find(b=>b.type==='text')?.text || 'Could not generate message.';
+    output.className = 'ai-output';
+    output.textContent = text;
+  } catch(e) {
+    output.className = 'ai-output';
+    output.textContent = 'Error: ' + (e.message || 'Could not reach API.');
+  }
+}
+
+function copyDraft() {
+  const text = document.getElementById('ai-output').textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+// ─── INIT ────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  msalInstance = new msal.PublicClientApplication(msalConfig);
+  await msalInstance.initialize();
+  try {
+    await msalInstance.handleRedirectPromise();
+  } catch(e) {}
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    msalInstance.setActiveAccount(accounts[0]);
+    await onSignedIn(accounts[0]);
+  }
+});
+
+document.getElementById('detail-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closePanel(); });
+document.getElementById('add-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeAddPanel(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePanel(); closeAddPanel(); } });
+</script>
+</body>
+</html>
